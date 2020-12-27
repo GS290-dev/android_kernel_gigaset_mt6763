@@ -69,6 +69,24 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 	frame->fp = *(unsigned long *)(fp);
 	frame->pc = *(unsigned long *)(fp + 8);
 
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	if (tsk && tsk->ret_stack &&
+			(frame->pc == (unsigned long)return_to_handler)) {
+		if (WARN_ON_ONCE(frame->graph == -1))
+			return -EINVAL;
+		if (frame->graph < -1)
+			frame->graph += FTRACE_NOTRACE_DEPTH;
+
+		/*
+		 * This is a case where function graph tracer has
+		 * modified a return address (LR) in a stack frame
+		 * to hook a function return.
+		 * So replace it to an original value.
+		 */
+		frame->pc = tsk->ret_stack[frame->graph--].ret;
+	}
+#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+
 	/*
 	 * Check whether we are going to walk through from interrupt stack
 	 * to task stack.

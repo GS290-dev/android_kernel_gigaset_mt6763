@@ -298,6 +298,7 @@ config SYN_COOKIES
 
 config NET_IPVTI
 	tristate "Virtual (secure) IP: tunneling"
+	depends on IPV6 || IPV6=n
 	select INET_TUNNEL
 	select NET_IP_TUNNEL
 	depends on INET_XFRM_MODE_TUNNEL
@@ -363,7 +364,6 @@ config INET_ESP
 	select CRYPTO_SHA512
 	select CRYPTO_DES
 	select CRYPTO_ECHAINIV
-
 	---help---
 	  Support for IPsec ESP.
 

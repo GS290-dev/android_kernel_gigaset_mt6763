@@ -11,6 +11,9 @@
 #include <linux/bug.h>
 #include <linux/restart_block.h>
 
+struct timespec;
+struct compat_timespec;
+
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 /*
  * For CONFIG_THREAD_INFO_IN_TASK kernels we need <asm/current.h> for the
@@ -26,11 +29,7 @@
 
 #ifdef __KERNEL__
 
-#ifdef CONFIG_DEBUG_STACK_USAGE
-# define THREADINFO_GFP		(GFP_KERNEL | __GFP_NOTRACK | __GFP_ZERO)
-#else
-# define THREADINFO_GFP		(GFP_KERNEL | __GFP_NOTRACK)
-#endif
+#define THREADINFO_GFP		(GFP_KERNEL | __GFP_NOTRACK | __GFP_ZERO)
 
 /*
  * flag set/clear/test wrappers

@@ -406,7 +406,7 @@ static int m4u_fill_sgtable_user(struct vm_area_struct *vma, unsigned long va, i
 		for (fault_cnt = 0; fault_cnt < 3000; fault_cnt++) {
 			if (has_page) {
 				ret = get_user_pages(current, current->mm, va_tmp, 1,
-					(vma->vm_flags & VM_WRITE), 0, &pages, NULL);
+					(vma->vm_flags & VM_WRITE) ? FOLL_WRITE : 0, &pages, NULL);
 
 				if (ret == 1)
 					pa = page_to_phys(pages) | (va_tmp & ~PAGE_MASK);
