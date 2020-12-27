@@ -40,6 +40,10 @@
 #include <asm/param.h>
 #include <asm/page.h>
 
+#ifdef CONFIG_MTK_USE_RESERVED_EXT_MEM
+#include <linux/exm_driver.h>
+#endif
+
 #ifndef user_long_t
 #define user_long_t long
 #endif
@@ -1266,6 +1270,11 @@ static bool always_dump_vma(struct vm_area_struct *vma)
 	if (arch_vma_name(vma))
 		return true;
 
+#ifdef CONFIG_MTK_USE_RESERVED_EXT_MEM
+	if (extmem_in_mspace(vma))
+		return true;
+#endif
+
 	return false;
 }
 
@@ -2250,7 +2259,7 @@ static int elf_core_dump(struct coredump_params *cprm)
 
 	dataoff = offset = roundup(offset, ELF_EXEC_PAGESIZE);
 
-	vma_filesz = kmalloc_array(segs - 1, sizeof(*vma_filesz), GFP_KERNEL);
+	vma_filesz = vmalloc((segs - 1) * sizeof(*vma_filesz));
 	if (!vma_filesz)
 		goto end_coredump;
 
@@ -2326,6 +2335,23 @@ static int elf_core_dump(struct coredump_params *cprm)
 
 		end = vma->vm_start + vma_filesz[i++];
 
+#ifdef CONFIG_MTK_USE_RESERVED_EXT_MEM
+		if (extmem_in_mspace(vma)) {
+			void *extmem_va = (void *)get_virt_from_mspace(vma->vm_pgoff << PAGE_SHIFT);
+
+			for (addr = vma->vm_start; addr < end; addr += PAGE_SIZE, extmem_va += PAGE_SIZE) {
+				int stop = !dump_emit(cprm, extmem_va, PAGE_SIZE);
+
+				if (stop) {
+					pr_err("[EXT_MEM]stop addr:0x%lx, extmem_va:0x%p, vm_start:0x%lx, vm_end:0x%lx\n",
+						addr, extmem_va, vma->vm_start, end);
+					goto end_coredump;
+				}
+			}
+			continue;
+		}
+#endif
+
 		for (addr = vma->vm_start; addr < end; addr += PAGE_SIZE) {
 			struct page *page;
 			int stop;
@@ -2338,8 +2364,11 @@ static int elf_core_dump(struct coredump_params *cprm)
 				page_cache_release(page);
 			} else
 				stop = !dump_skip(cprm, PAGE_SIZE);
-			if (stop)
+			if (stop) {
+				pr_err("%s: stop addr:0x%lx, vm_start:0x%lx, vm_end:0x%lx, dump_size:0x%lx\n",
+						__func__, addr, vma->vm_start, vma->vm_end, end - vma->vm_start);
 				goto end_coredump;
+			}
 		}
 	}
 	dump_truncate(cprm);
@@ -2358,7 +2387,7 @@ end_coredump:
 cleanup:
 	free_note_info(&info);
 	kfree(shdr4extnum);
-	kfree(vma_filesz);
+	vfree(vma_filesz);
 	kfree(phdr4note);
 	kfree(elf);
 out:

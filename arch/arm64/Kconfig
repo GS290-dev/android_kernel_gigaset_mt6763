@@ -6,6 +6,7 @@ config ARM64
 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
 	select ARCH_HAS_ELF_RANDOMIZE
 	select ARCH_HAS_GCOV_PROFILE_ALL
+	select ARCH_HAS_KCOV
 	select ARCH_HAS_SG_CHAIN
 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
 	select ARCH_USE_CMPXCHG_LOCKREF
@@ -415,6 +416,26 @@ config ARM64_ERRATUM_843419
 
 	  If unsure, say Y.
 
+config ARM64_ERRATUM_855872
+	bool "Cortex-A53: 855872: A Store-Exclusive instruction might pass when it should fail"
+	default y
+	help
+	  This option adds a DMB to before each LDAXR and LDXR to avoid conditions
+	  of erratum 855872 on Cortex-A53 parts up to r0p4.
+	  Because of this erratum, the processor which acquires lock might pass when it should
+	  fail.
+
+	  If unsure, say Y.
+
+config ARM64_ERRATUM_855873
+	bool "Cortex-A53: 855873: An eviction might overtake a cache clean operation"
+	default y
+	help
+	  This option adds an alternative code sequence to work around ARM
+	  erratum 855873 on Cortex-A53 parts up to r0p4.
+	  Because of this erratum, the processor might issue an eviction and
+	  an L2 cache clean operation to the interconnect in the wrong order.
+
 config ARM64_ERRATUM_1024718
 	bool "Cortex-A55: 1024718: Update of DBM/AP bits without break before make might result in incorrect update"
 	default y
@@ -667,7 +688,7 @@ config FORCE_MAX_ZONEORDER
 
 config UNMAP_KERNEL_AT_EL0
 	bool "Unmap kernel when running in userspace (aka \"KAISER\")" if EXPERT
-	default y
+	default n
 	help
 	  Speculation attacks against some high-performance processors can
 	  be used to bypass MMU permission checks and leak kernel data to
@@ -959,6 +980,15 @@ config BUILD_ARM64_APPENDED_DTB_IMAGE
 	  DTBs to be built by default (instead of a standalone Image.gz.)
 	  The image will built in arch/arm64/boot/Image.gz-dtb
 
+config BUILD_ARM64_DTB_OVERLAY_IMAGE
+	bool "Build a device tree overlay image"
+	depends on OF
+	help
+	  Enabling this option will casue overlay device tree
+	  to be built by default.
+	  Overlay DT contains device-specific configurations.
+	  Please be aware that bootloader supports DT merging.
+
 choice
 	prompt "Appended DTB Kernel Image name"
 	depends on BUILD_ARM64_APPENDED_DTB_IMAGE
@@ -985,6 +1015,13 @@ config BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES
 	help
 	  Space separated list of names of dtbs to append when
 	  building a concatenated Image.gz-dtb.
+
+config BUILD_ARM64_DTB_OVERLAY_IMAGE_NAMES
+	string "Default dtb overlay names"
+	depends on BUILD_ARM64_DTB_OVERLAY_IMAGE
+	help
+	  Space separated list of names of dtbs to append when
+	  building a concatenated overlay image
 
 endmenu
 

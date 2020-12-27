@@ -477,6 +477,7 @@ config DM_VERITY_HASH_PREFETCH_MIN_SIZE
 config DM_VERITY_FEC
 	bool "Verity forward error correction support"
 	depends on DM_VERITY
+	depends on !MTK_ENABLE_GMO
 	select REED_SOLOMON
 	select REED_SOLOMON_DEC8
 	---help---
@@ -514,6 +515,14 @@ config DM_LOG_WRITES
 	  To compile this code as a module, choose M here: the module will
 	  be called dm-log-writes.
 
+	  If unsure, say N.
+
+config MTK_HW_FDE
+	tristate "Mediatek HW FDE support"
+	---help---
+	  This selects the MediaTek(R) crypto engine for Full Disk Encryption.
+
+	  If you have a machine with a MTK crypto engine for FDE, say Y here.
 	  If unsure, say N.
 
 config DM_VERITY_AVB

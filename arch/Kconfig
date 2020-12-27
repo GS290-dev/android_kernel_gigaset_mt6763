@@ -646,4 +646,15 @@ config OLD_SIGACTION
 config COMPAT_OLD_SIGACTION
 	bool
 
+config PRIZE_ISINK_SUB_FLASHLIGHT
+	bool "Enable PRIZE_ISINK_SUB_FLASHLIGHT support"
+	default n
+	help
+	  PRIZE_ISINK_SUB_FLASHLIGHT
+	 
+config PRIZE_USE_RGB_LED_SUPPORT
+	bool "Enable PRIZE_VTOUCH_USE_MT6370_LDO support"
+	default n
+	help
+	  PRIZE_USE_RGB_LED_SUPPORT  
 source "kernel/gcov/Kconfig"

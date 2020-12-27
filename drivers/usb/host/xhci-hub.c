@@ -27,6 +27,10 @@
 #include "xhci.h"
 #include "xhci-trace.h"
 
+#ifdef CONFIG_USB_XHCI_MTK
+#include "xhci-mtk.h"
+#endif
+
 #define	PORT_WAKE_BITS	(PORT_WKOC_E | PORT_WKDISC_E | PORT_WKCONN_E)
 #define	PORT_RWC_BITS	(PORT_CSC | PORT_PEC | PORT_WRC | PORT_OCC | \
 			 PORT_RC | PORT_PLC | PORT_PE)
@@ -348,7 +352,7 @@ int xhci_find_slot_id_by_port(struct usb_hcd *hcd, struct xhci_hcd *xhci,
 
 	slot_id = 0;
 	for (i = 0; i < MAX_HC_SLOTS; i++) {
-		if (!xhci->devs[i])
+		if (!xhci->devs[i] || !xhci->devs[i]->udev)
 			continue;
 		speed = xhci->devs[i]->udev->speed;
 		if (((speed >= USB_SPEED_SUPER) == (hcd->speed >= HCD_USB3))
@@ -1358,6 +1362,15 @@ int xhci_bus_suspend(struct usb_hcd *hcd)
 	hcd->state = HC_STATE_SUSPENDED;
 	bus_state->next_statechange = jiffies + msecs_to_jiffies(10);
 	spin_unlock_irqrestore(&xhci->lock, flags);
+
+#ifdef CONFIG_USB_XHCI_MTK_SUSPEND_SUPPORT
+	if (hcd->self.root_hub->do_remote_wakeup == 1) {
+		xhci_info(xhci, "xhci_bus_suspend_unlock = %d %d\n",
+			hcd->self.root_hub->do_remote_wakeup, max_ports);
+		mtk_xhci_wakelock_unlock();
+	}
+#endif
+
 	return 0;
 }
 
@@ -1450,6 +1463,14 @@ int xhci_bus_resume(struct usb_hcd *hcd)
 		} else
 			writel(temp, port_array[port_index]);
 	}
+
+#ifdef CONFIG_USB_XHCI_MTK_SUSPEND_SUPPORT
+	if (hcd->self.root_hub->do_remote_wakeup == 1) {
+		xhci_info(xhci, "xhci_bus_resume_lock = %d %d\n",
+			hcd->self.root_hub->do_remote_wakeup, max_ports);
+		mtk_xhci_wakelock_lock();
+	}
+#endif
 
 	if (need_usb2_u3_exit) {
 		spin_unlock_irqrestore(&xhci->lock, flags);

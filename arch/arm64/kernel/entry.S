@@ -27,6 +27,7 @@
 #include <asm/cpufeature.h>
 #include <asm/errno.h>
 #include <asm/esr.h>
+#include <asm/memory.h>
 #include <asm/irq.h>
 #include <asm/memory.h>
 #include <asm/mmu.h>
@@ -36,6 +37,22 @@
 #include <asm/asm-uaccess.h>
 #include <asm/unistd.h>
 
+#define RESERVE_SIZE 256
+
+#ifdef CONFIG_MTK_DYNAMIC_LOAD_STORE_BYPASS_WA
+#define ARM_SMCCC_ARCH_WORKAROUND_2	0x80007FFF
+#define CA73_PART_NUM		(0xd09 << 4)
+	.macro	apply_ssbd, state, targ, tmp1, tmp2
+	mrs	\tmp1, midr_el1
+	and	\tmp1, \tmp1, MIDR_PARTNUM_MASK
+	ldr	\tmp2, =CA73_PART_NUM
+	eor	\tmp1, \tmp1, \tmp2
+	cbnz	\tmp1, \targ
+	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
+	mov	w1, #\state
+	smc	#0x0
+	.endm
+#endif
 /*
  * Context tracking subsystem.  Used to instrument transitions
  * between user and kernel mode.
@@ -86,6 +103,10 @@ alternative_if ARM64_UNMAP_KERNEL_AT_EL0
 alternative_else_nop_endif
 #endif
 
+	.if	\el == 1
+	sub	sp, sp, #RESERVE_SIZE
+	.endif
+
 	sub	sp, sp, #S_FRAME_SIZE
 	b	el\()\el\()_\label
 	.endm
@@ -127,6 +148,13 @@ alternative_else_nop_endif
 #endif
 	disable_step_tsk x19, x20		// exceptions when scheduling.
 
+#ifdef CONFIG_MTK_DYNAMIC_LOAD_STORE_BYPASS_WA
+	apply_ssbd 1, 7f, x0, x1
+	ldp	x2, x3, [sp, #16 * 1]
+7:
+	ldp	x0, x1, [sp, #16 * 0]
+#endif
+
 	mov	x29, xzr			// fp pointed to user-space
 	.else
 	add	x21, sp, #S_FRAME_SIZE
@@ -148,6 +176,9 @@ alternative_else_nop_endif
 	.endif /* \el == 0 */
 	mrs	x22, elr_el1
 	mrs	x23, spsr_el1
+	.if	\el == 1
+	add	x21, x21, #RESERVE_SIZE
+	.endif
 	stp	lr, x21, [sp, #S_LR]
 
 #ifdef CONFIG_ARM64_SW_TTBR0_PAN
@@ -267,6 +298,10 @@ alternative_if ARM64_WORKAROUND_845719
 alternative_else_nop_endif
 #endif
 3:
+#ifdef CONFIG_MTK_DYNAMIC_LOAD_STORE_BYPASS_WA
+	apply_ssbd 0, 7f, x0, x1
+7:
+#endif
 	.endif
 
 	msr	elr_el1, x21			// set up the return data
@@ -288,6 +323,10 @@ alternative_else_nop_endif
 	ldp	x28, x29, [sp, #16 * 14]
 	ldr	lr, [sp, #S_LR]
 	add	sp, sp, #S_FRAME_SIZE		// restore sp
+
+	.if	\el == 1
+	add	sp, sp, #RESERVE_SIZE
+	.endif
 
 	.if	\el == 0
 alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
@@ -466,6 +505,26 @@ ENDPROC(el1_error_invalid)
 	.align	6
 el1_sync:
 	kernel_entry 1
+	mov	x0, sp
+	get_thread_info x20	// top of stack
+	ldr	w4, [x20, #TI_CPU_EXCP]
+	add	w4, w4, #0x1
+	str	w4, [x20, #TI_CPU_EXCP]
+	cmp	w4, #0x1
+	b.ne	el1_sync_nest
+	str	x0, [x20, #TI_REGS_ON_EXCP]
+el1_sync_nest:
+	mrs	x1, esr_el1			// read the syndrome register
+	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+	b.ne	el1_sync_nest_skip_dec
+	sub	w4, w4, #0x1
+	str	w4, [x20, #TI_CPU_EXCP]
+el1_sync_nest_skip_dec:
+	cmp	w4, #0x2
+	b.lt	el1_sync_nest_skip
+	bl	aee_stop_nested_panic
+el1_sync_nest_skip:
 	mrs	x1, esr_el1			// read the syndrome register
 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
 	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
@@ -501,6 +560,14 @@ el1_da:
 	clear_address_tag x0, x3
 	mov	x2, sp				// struct pt_regs
 	bl	do_mem_abort
+	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+	b.eq	el1_da_nest_skip_dec
+	mov	x5, sp
+	get_thread_info x20	// top of stack
+	ldr	w4, [x20, #TI_CPU_EXCP]
+	sub	w4, w4, #0x1
+	str	w4, [x20, #TI_CPU_EXCP]
+el1_da_nest_skip_dec:
 
 	// disable interrupts before pulling preserved data off the stack
 	disable_irq
@@ -519,7 +586,7 @@ el1_undef:
 	 */
 	enable_dbg
 	mov	x0, sp
-	b	do_undefinstr
+	bl	do_undefinstr
 el1_dbg:
 	/*
 	 * Debug exception handling
@@ -530,6 +597,12 @@ el1_dbg:
 	mrs	x0, far_el1
 	mov	x2, sp				// struct pt_regs
 	bl	do_debug_exception
+	mov	x5, sp
+	get_thread_info x20	// top of stack
+	ldr	w4, [x20, #TI_CPU_EXCP]
+	sub	w4, w4, #0x1
+	str	w4, [x20, #TI_CPU_EXCP]
+
 	kernel_exit 1
 el1_inv:
 	// TODO: add support for undefined instructions in kernel mode

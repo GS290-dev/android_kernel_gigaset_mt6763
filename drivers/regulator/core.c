@@ -253,7 +253,17 @@ static int regulator_check_consumers(struct regulator_dev *rdev,
 		 */
 		if (!regulator->min_uV && !regulator->max_uV)
 			continue;
-
+		//prize-modify-pengzhipeng-20190513-start
+		if(!strcmp(regulator->supply_name,"kd_camera_hw-vcamd"))
+		{
+			continue;
+		}
+		if(!strcmp(regulator->supply_name,"kd_camera_hw-vcamd_sub"))
+		{
+			continue;
+		}
+		//printk("lsw_dvdd %s %d %s\n",__func__,__LINE__,regulator->supply_name);
+		//prize-modify-pengzhipeng-20190513-end	
 		if (*max_uV > regulator->max_uV)
 			*max_uV = regulator->max_uV;
 		if (*min_uV < regulator->min_uV)

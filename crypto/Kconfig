@@ -273,7 +273,7 @@ config CRYPTO_ECHAINIV
 	select CRYPTO_AEAD
 	select CRYPTO_NULL
 	select CRYPTO_RNG_DEFAULT
-	default m
+	default y
 	help
 	  This IV generator generates an IV based on the encryption of
 	  a sequence number xored with a salt.  This is the default
@@ -1552,6 +1552,15 @@ config CRYPTO_LZO
 	select LZO_DECOMPRESS
 	help
 	  This is the LZO algorithm.
+
+config CRYPTO_LZ4K
+        tristate "LZ4K compression algorithm"
+	default n
+        select CRYPTO_ALGAPI
+        help
+          Mediatek's proprietary LZ4K algorithm.
+	  It has better compression ratio than the one in LZO
+	  with less performance degradation.
 
 config CRYPTO_842
 	tristate "842 compression algorithm"

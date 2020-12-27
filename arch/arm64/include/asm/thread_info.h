@@ -57,6 +57,8 @@ struct thread_info {
 #ifndef CONFIG_THREAD_INFO_IN_TASK
 	int			cpu;		/* cpu */
 #endif
+	void			*regs_on_excp;	/* aee */
+	int			cpu_excp;	/* aee */
 };
 
 #ifdef CONFIG_THREAD_INFO_IN_TASK
@@ -64,6 +66,7 @@ struct thread_info {
 {									\
 	.preempt_count	= INIT_PREEMPT_COUNT,				\
 	.addr_limit	= KERNEL_DS,					\
+	.cpu_excp	= 0,			/* aee */		\
 }
 #else
 #define INIT_THREAD_INFO(tsk)						\
@@ -72,6 +75,7 @@ struct thread_info {
 	.flags		= 0,						\
 	.preempt_count	= INIT_PREEMPT_COUNT,				\
 	.addr_limit	= KERNEL_DS,					\
+	.cpu_excp	= 0,			/* aee */		\
 }
 
 /*
