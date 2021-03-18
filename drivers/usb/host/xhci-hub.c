@@ -1428,6 +1428,9 @@ int xhci_bus_suspend(struct usb_hcd *hcd)
 	hcd->state = HC_STATE_SUSPENDED;
 	bus_state->next_statechange = jiffies + msecs_to_jiffies(10);
 	spin_unlock_irqrestore(&xhci->lock, flags);
+
+	if (bus_state->bus_suspended)
+		usleep_range(5000, 10000);
 #if IS_ENABLED(CONFIG_USB_XHCI_MTK_SUSPEND)
 	if (hcd->self.root_hub->do_remote_wakeup == 1) {
 		struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
